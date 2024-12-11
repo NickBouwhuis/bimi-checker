@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BIMI Record Checker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background-color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .svg-preview {
+            width: 32px;
+            height: 32px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .svg-preview svg {
+            width: 100%;
+            height: 100%;
+        }
+        .result-info {
+            flex-grow: 1;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .domain {
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+        }
+        .record {
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+            margin: 5px 0;
+            word-break: break-all;
+        }
+        .logo-url {
+            font-size: 12px;
+            color: #007bff;
+            margin: 5px 0;
+        }
+        .no-record {
+            color: #dc3545;
+            margin: 0;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .status-bar {
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .progress {
+            flex-grow: 1;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            margin: 0 20px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #007bff;
+            width: 0;
+            transition: width 0.3s ease;
+        }
+        .status-text {
+            min-width: 100px;
+            text-align: right;
+        }
+        .stats-container {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .stat-box {
+            background-color: white;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin: 5px 0;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+        .stat-box.success .stat-number { color: #28a745; }
+        .stat-box.warning .stat-number { color: #dc3545; }
+
+        .filter-controls {
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+    
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+    
+        .toggle-label input[type="checkbox"] {
+            margin-right: 10px;
+            width: 16px;
+            height: 16px;
+        }
+    
+        .result.no-bimi {
+            display: none;
+        }
+    
+        .result.no-bimi.show {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>BIMI Record Checker</h1>
+        <form id="checkForm">
+            <textarea name="domains" placeholder="Enter domain(s) - one per line&#10;Example:&#10;google.com&#10;yahoo.com"></textarea>
+            <button type="submit">Check BIMI Records</button>
+        </form>
+	<div class="filter-controls">
+	    <label class="toggle-label">
+	        <input type="checkbox" id="hideNoBimi" checked>
+	        Hide domains without BIMI records
+	    </label>
+	</div>
+        
+        <div id="statusBar" class="status-bar" style="display: none;">
+            <span class="domains-processed">0 / 0 domains</span>
+            <div class="progress">
+                <div class="progress-bar"></div>
+            </div>
+            <span class="status-text">0%</span>
+        </div>
+
+        <div id="statsContainer" class="stats-container" style="display: none;">
+            <div class="stat-box">
+                <div class="stat-label">Total Domains</div>
+                <div class="stat-number" id="totalCount">0</div>
+            </div>
+            <div class="stat-box success">
+                <div class="stat-label">BIMI Records Found</div>
+                <div class="stat-number" id="foundCount">0</div>
+            </div>
+            <div class="stat-box warning">
+                <div class="stat-label">No BIMI Records</div>
+                <div class="stat-number" id="notFoundCount">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-number" id="successRate">0%</div>
+            </div>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        async function checkDomain(domain) {
+            const formData = new FormData();
+            formData.append('domains', domain);
+            const response = await fetch('/check', {
+                method: 'POST',
+                body: formData
+            });
+            return await response.json();
+        }
+
+        function updateProgress(processed, total) {
+            const percentage = Math.round((processed / total) * 100);
+            document.querySelector('.progress-bar').style.width = percentage + '%';
+            document.querySelector('.domains-processed').textContent = `${processed} / ${total} domains`;
+            document.querySelector('.status-text').textContent = `${percentage}%`;
+        }
+
+        function updateStats(results) {
+            const total = Object.keys(results).length;
+            const found = Object.values(results).filter(r => r.has_record).length;
+            const notFound = total - found;
+            const successRate = total > 0 ? Math.round((found / total) * 100) : 0;
+
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('foundCount').textContent = found;
+            document.getElementById('notFoundCount').textContent = notFound;
+            document.getElementById('successRate').textContent = `${successRate}%`;
+            document.getElementById('statsContainer').style.display = 'grid';
+        }
+
+        function createResultElement(domain, data) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result';
+            
+            if (data.has_record) {
+                resultDiv.innerHTML = `
+                    <div class="svg-preview">
+                        ${data.is_valid_svg ? data.svg_content : '❌'}
+                    </div>
+                    <div class="result-info">
+                        <p class="domain">${domain}</p>
+                        <p class="record">${data.record}</p>
+                        <p class="logo-url">${data.logo_url}</p>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="svg-preview">❌</div>
+                    <div class="result-info">
+                        <p class="domain">${domain}</p>
+                        <p class="no-record">No BIMI record found</p>
+                    </div>
+                `;
+            }
+            return resultDiv;
+        }
+
+        document.getElementById('checkForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const button = form.querySelector('button');
+            const statusBar = document.getElementById('statusBar');
+            const resultsDiv = document.getElementById('results');
+            
+            // Reset UI
+            button.disabled = true;
+            statusBar.style.display = 'flex';
+            resultsDiv.innerHTML = '';
+            document.getElementById('statsContainer').style.display = 'none';
+            
+            const domains = form.domains.value.split('\n')
+                .map(d => d.trim())
+                .filter(d => d);
+            
+            let processed = 0;
+            const results = {};
+            
+            try {
+                const batchSize = 5;
+                for (let i = 0; i < domains.length; i += batchSize) {
+                    const batch = domains.slice(i, i + batchSize);
+                    await Promise.all(batch.map(async domain => {
+                        try {
+                            const result = await checkDomain(domain);
+                            results[domain] = result[domain];
+                            
+                            const resultElement = createResultElement(domain, result[domain]);
+                            resultsDiv.insertBefore(resultElement, resultsDiv.firstChild);
+                            
+                            processed++;
+                            updateProgress(processed, domains.length);
+                            updateStats(results);
+                        } catch (error) {
+                            console.error(`Error checking domain ${domain}:`, error);
+                        }
+                    }));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                button.disabled = false;
+                setTimeout(() => {
+                    statusBar.style.display = 'none';
+                }, 2000);
+            }
+        };
+    function createResultElement(domain, data) {
+        const resultDiv = document.createElement('div');
+        resultDiv.className = data.has_record ? 'result' : 'result no-bimi';
+        
+        if (data.has_record) {
+            resultDiv.innerHTML = `
+                <div class="svg-preview">
+                    ${data.is_valid_svg ? data.svg_content : '❌'}
+                </div>
+                <div class="result-info">
+                    <p class="domain">${domain}</p>
+                    <p class="record">${data.record}</p>
+                    <p class="logo-url">${data.logo_url}</p>
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div class="svg-preview">❌</div>
+                <div class="result-info">
+                    <p class="domain">${domain}</p>
+                    <p class="no-record">No BIMI record found</p>
+                </div>
+            `;
+        }
+        return resultDiv;
+    }
+
+    // Add this new function
+    function updateVisibility() {
+        const hideNoBimi = document.getElementById('hideNoBimi').checked;
+        const noBimiResults = document.querySelectorAll('.result.no-bimi');
+        noBimiResults.forEach(result => {
+            if (hideNoBimi) {
+                result.classList.remove('show');
+            } else {
+                result.classList.add('show');
+            }
+        });
+    }
+
+    // Add event listener for the checkbox
+    document.getElementById('hideNoBimi').addEventListener('change', updateVisibility);
+
+    // Update the form submission handler
+    document.getElementById('checkForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const button = form.querySelector('button');
+        const statusBar = document.getElementById('statusBar');
+        const resultsDiv = document.getElementById('results');
+        
+        // Reset UI
+        button.disabled = true;
+        statusBar.style.display = 'flex';
+        resultsDiv.innerHTML = '';
+        document.getElementById('statsContainer').style.display = 'none';
+        
+        const domains = form.domains.value.split('\n')
+            .map(d => d.trim())
+            .filter(d => d);
+        
+        let processed = 0;
+        const results = {};
+        
+        try {
+            const batchSize = 5;
+            for (let i = 0; i < domains.length; i += batchSize) {
+                const batch = domains.slice(i, i + batchSize);
+                await Promise.all(batch.map(async domain => {
+                    try {
+                        const result = await checkDomain(domain);
+                        results[domain] = result[domain];
+                        
+                        const resultElement = createResultElement(domain, result[domain]);
+                        resultsDiv.insertBefore(resultElement, resultsDiv.firstChild);
+                        
+                        processed++;
+                        updateProgress(processed, domains.length);
+                        updateStats(results);
+                        updateVisibility(); // Add this line to apply visibility settings
+                    } catch (error) {
+                        console.error(`Error checking domain ${domain}:`, error);
+                    }
+                }));
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        } finally {
+            button.disabled = false;
+            setTimeout(() => {
+                statusBar.style.display = 'none';
+            }, 2000);
+        }
+    };
+    </script>
+</body>
+</html>
